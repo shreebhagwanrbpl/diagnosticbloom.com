@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useMemo } from "react";
 import Image from "next/image";
 import toast from "react-hot-toast";
 import { usePathname } from "next/navigation";
-import { fallbackProducts, makeSlug } from "@/data/productsData";
+import { makeSlug } from "@/data/productsData";
 import { fetchAllDynamicProducts } from "@/lib/fetchProducts";
 
 import {
@@ -23,6 +23,7 @@ import {
     collection,
 } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { Microscope } from "lucide-react";
 
 const loadImageBase64 = async (src) => {
     try {
@@ -189,7 +190,7 @@ const getWebsiteDomain = () => {
             return host;
         }
     }
-    return "clinidix.com";
+    return "diagnosticbloom.com";
 };
 
 export default function ProductDetails({ slug }) {
@@ -240,7 +241,6 @@ export default function ProductDetails({ slug }) {
         if (product.category) addSpec("Category", product.category);
         if (product.subCategory) addSpec("Sub Category", product.subCategory);
         if (product.categoryProductId) addSpec("Product ID", product.categoryProductId);
-        // if (product.price && String(product.price).trim()) addSpec("Price", `₹ ${product.price}`);
 
         // Parse parameters string if given in admin
         if (product.parameters && typeof product.parameters === "string") {
@@ -304,31 +304,11 @@ export default function ProductDetails({ slug }) {
         const loadProduct = async () => {
             try {
                 const allProducts = await fetchAllDynamicProducts();
-
-                let found = allProducts.find(
+                const found = allProducts.find(
                     (p) => p.slug === slug || makeSlug(p.title) === slug || p.id === slug
                 );
 
-                // Fallback search in fallbackProducts
-                if (!found) {
-                    found = fallbackProducts.find(
-                        (p) => p.slug === slug || makeSlug(p.title) === slug || p.id === slug
-                    );
-                }
-
-                // Ultimate fallback so PDP never breaks
-                if (!found && fallbackProducts.length > 0) {
-                    const prettyTitle = slug
-                        ? slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-                        : "Biomedical Equipment";
-                    found = {
-                        ...fallbackProducts[0],
-                        title: prettyTitle,
-                        slug: slug || "biomedical-equipment",
-                    };
-                }
-
-                setProduct(found);
+                setProduct(found || null);
 
                 if (found) {
                     const mainImg =
@@ -336,36 +316,18 @@ export default function ProductDetails({ slug }) {
                         found.image ||
                         found.imgUrl ||
                         found.imageUrl ||
-                        "/logo.png";
+                        "";
                     setSelectedImage(mainImg);
+                    setSelectedMedia("image");
+                } else {
+                    setSelectedImage("");
                     setSelectedMedia("image");
                 }
             } catch (error) {
-                console.error("Error loading product from Firestore, using fallback:", error);
-                let found = fallbackProducts.find(
-                    (p) => p.slug === slug || makeSlug(p.title) === slug || p.id === slug
-                );
-                if (!found && fallbackProducts.length > 0) {
-                    const prettyTitle = slug
-                        ? slug.replace(/-/g, " ").replace(/\b\w/g, (c) => c.toUpperCase())
-                        : "Biomedical Equipment";
-                    found = {
-                        ...fallbackProducts[0],
-                        title: prettyTitle,
-                        slug: slug || "biomedical-equipment",
-                    };
-                }
-                setProduct(found);
-                if (found) {
-                    const mainImg =
-                        (Array.isArray(found.images) && found.images[0]) ||
-                        found.image ||
-                        found.imgUrl ||
-                        found.imageUrl ||
-                        "/logo.png";
-                    setSelectedImage(mainImg);
-                    setSelectedMedia("image");
-                }
+                console.error("Error loading product from Firestore:", error);
+                setProduct(null);
+                setSelectedImage("");
+                setSelectedMedia("image");
             }
         };
 
@@ -376,7 +338,7 @@ export default function ProductDetails({ slug }) {
         const loadContact = async () => {
             try {
                 const snap = await getDoc(
-                    doc(db, "websites", "clinidixcom", "pages", "contact")
+                    doc(db, "websites", "diagnosticbloomcom", "pages", "contact")
                 );
                 if (snap.exists()) {
                     setContactInfo(snap.data().contactInfo || []);
@@ -428,12 +390,12 @@ export default function ProductDetails({ slug }) {
             const pageHeight = 297;
             const contentWidth = pageWidth - 2 * margin;
 
-            // Clinidix Theme Colors
-            const colorPrimary = [192, 88, 0];       // #C05800 Brand Orange
-            const colorDark = [56, 36, 13];          // #38240D Deep Brown Text
-            const colorGray = [91, 70, 52];          // #5B4634 Subtitle Text
-            const colorLightBorder = [232, 211, 188];// #E8D3BC Light Border
-            const colorBgWarm = [255, 249, 239];     // #FFF9EF Warm Background
+            // Royal Indigo Palette
+            const colorPrimary = [54, 82, 186];      // #3652BA Brand Royal Indigo
+            const colorDark = [15, 23, 42];          // #0F172A Deep Navy Text
+            const colorGray = [100, 116, 139];       // #64748B Slate Gray Text
+            const colorLightBorder = [219, 228, 252];// #DBE4FC Light Border
+            const colorBgWarm = [238, 242, 255];     // #EEF2FF Soft Ice Blue
 
             // 1. HEADER
             let headerLeftOffset = margin;
@@ -491,7 +453,7 @@ export default function ProductDetails({ slug }) {
             pdfDoc.setFont("helvetica", "bold");
             pdfDoc.setFontSize(8.5);
             pdfDoc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2]);
-            pdfDoc.text((product.category || "BIOMEDICAL EQUIPMENT").toUpperCase(), margin, 42);
+            pdfDoc.text((product.category || "").toUpperCase(), margin, 42);
 
             pdfDoc.setFont("helvetica", "bold");
             pdfDoc.setFontSize(15);
@@ -546,7 +508,7 @@ export default function ProductDetails({ slug }) {
             pdfDoc.setFontSize(8.5);
             pdfDoc.setTextColor(colorGray[0], colorGray[1], colorGray[2]);
 
-            let descText = product.desc || product.description || "High precision diagnostic instrument engineered for clinical accuracy.";
+            let descText = product.desc || product.description || "";
             if (descText.length > 350) {
                 descText = descText.substring(0, 350) + "...";
             }
@@ -628,25 +590,18 @@ export default function ProductDetails({ slug }) {
         e.preventDefault();
 
         const phoneRegex = /^[6-9]\d{9}$/;
-        const emailRegex =
-            /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
         if (!form.name.trim()) {
-            return toast.error(
-                "Name is required"
-            );
+            return toast.error("Name is required");
         }
 
         if (!emailRegex.test(form.email)) {
-            return toast.error(
-                "Enter valid email"
-            );
+            return toast.error("Enter valid email");
         }
 
         if (!phoneRegex.test(form.phone)) {
-            return toast.error(
-                "Enter valid mobile number"
-            );
+            return toast.error("Enter valid mobile number");
         }
 
         try {
@@ -656,7 +611,7 @@ export default function ProductDetails({ slug }) {
                 collection(
                     db,
                     "websitesQueries",
-                    "clinidixcom",
+                    "diagnosticbloomcom",
                     "productQueries"
                 ),
                 {
@@ -669,9 +624,7 @@ export default function ProductDetails({ slug }) {
                 }
             );
 
-            toast.success(
-                "Your enquiry has been submitted successfully."
-            );
+            toast.success("Your enquiry has been submitted successfully.");
 
             setForm({
                 name: "",
@@ -680,26 +633,22 @@ export default function ProductDetails({ slug }) {
             });
         } catch (error) {
             console.error(error);
-            toast.error(
-                "Something went wrong"
-            );
+            toast.error("Something went wrong");
         } finally {
             setSubmitting(false);
         }
     };
+
     const productSchema = product
         ? {
             "@context": "https://schema.org",
             "@type": "Product",
             name: product.title,
             image: product.image ? [product.image] : [],
-            description:
-                product.desc ||
-                product.description ||
-                product.title,
+            description: product.desc || product.description || "",
             brand: {
                 "@type": "Brand",
-                name: product.brand || "Rajbiosis Private Limited ",
+                name: product.brand || "",
             },
         }
         : null;
@@ -736,30 +685,20 @@ export default function ProductDetails({ slug }) {
     };
 
     const handleWhatsapp = () => {
-        const shareText = `🔬 ${product?.title}
-
-${product?.desc}
-
-🌐 ${window.location.href}`;
-
-        window.open(
-            `https://wa.me/?text=${encodeURIComponent(shareText)}`,
-            "_blank"
-        );
+        const shareText = `🔬 ${product?.title}\n\n${product?.desc}\n\n🌐 ${window.location.href}`;
+        window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank");
     };
 
     const handleFacebook = () => {
         window.open(
-            `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(
-                window.location.href
-            )}`,
+            `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(window.location.href)}`,
             "_blank"
         );
     };
 
     const handleInstagram = async () => {
         await navigator.clipboard.writeText(window.location.href);
-        toast.success("Instagram direct sharing available nahi hai. Link copied.");
+        toast.success("Instagram direct sharing not available. Link copied.");
     };
 
     const handleNativeShare = async () => {
@@ -776,217 +715,37 @@ ${product?.desc}
 
     useEffect(() => {
         const close = (e) => {
-            if (
-                shareRef.current &&
-                !shareRef.current.contains(e.target)
-            ) {
+            if (shareRef.current && !shareRef.current.contains(e.target)) {
                 setShowShare(false);
             }
         };
 
         document.addEventListener("mousedown", close);
-
-        return () =>
-            document.removeEventListener("mousedown", close);
+        return () => document.removeEventListener("mousedown", close);
     }, []);
 
     if (!product) {
         return (
-            <section className="py-10 md:py-20 bg-gradient-to-b from-white to-[#FDBD4]">
-
+            <section className="py-10 md:py-20 bg-slate-50">
                 <div className="container-custom">
-
-
                     <div className="grid lg:grid-cols-2 gap-12">
-
-
                         {/* Image Skeleton */}
-
-                        <div
-                            className="
-        h-[420px]
-        md:h-[520px]
-        rounded-[36px]
-        bg-gradient-to-br
-        from-[#F3D8B3]
-        via-[#FDBD4]
-        to-white
-        animate-pulse
-        "
-                        />
-
-
-
+                        <div className="h-[420px] md:h-[520px] rounded-[36px] bg-slate-200 animate-pulse" />
                         {/* Content Skeleton */}
-
                         <div>
-
-
-                            <div
-                                className="
-          h-12
-          w-3/4
-          bg-gradient-to-r
-          from-[#F3D8B3]
-          to-[#FDBD4]
-          rounded-xl
-          animate-pulse
-          mb-8
-          "
-                            />
-
-
-
+                            <div className="h-12 w-3/4 bg-slate-200 rounded-xl animate-pulse mb-8" />
                             {[...Array(8)].map((_, i) => (
-
-                                <div
-                                    key={i}
-                                    className="
-            h-6
-            bg-gradient-to-r
-            from-[#F3D8B3]
-            to-[#FDBD4]
-            rounded-lg
-            animate-pulse
-            mb-4
-            "
-                                />
-
+                                <div key={i} className="h-6 bg-slate-200 rounded-lg animate-pulse mb-4" />
                             ))}
-
-
                         </div>
-
-
                     </div>
-
-
-
-
-
-                    <div className="mt-16 grid lg:grid-cols-[600px_1fr] gap-8">
-
-
-
-                        {/* Left Card */}
-
-                        <div
-                            className="
-        bg-white
-        rounded-[24px]
-        md:rounded-[32px]
-        p-5
-        sm:p-6
-        md:p-8
-        shadow-sm
-        border
-        border-[#E8CFA8]
-        "
-                        >
-
-                            <div
-                                className="
-          h-10
-          w-48
-          bg-gradient-to-r
-          from-[#F3D8B3]
-          to-[#FDBD4]
-          rounded-lg
-          animate-pulse
-          mb-6
-          "
-                            />
-
-
-
-                            {[...Array(4)].map((_, i) => (
-
-                                <div
-                                    key={i}
-                                    className="
-            h-14
-            bg-gradient-to-r
-            from-[#F3D8B3]
-            to-[#FDBD4]
-            rounded-2xl
-            animate-pulse
-            mb-4
-            "
-                                />
-
-                            ))}
-
-
-                        </div>
-
-
-
-
-
-                        {/* Right Card */}
-
-                        <div
-                            className="
-        bg-white
-        rounded-[24px]
-        md:rounded-[32px]
-        p-5
-        sm:p-6
-        md:p-8
-        shadow-sm
-        border
-        border-[#E8CFA8]
-        "
-                        >
-
-                            <div
-                                className="
-          h-10
-          w-60
-          bg-gradient-to-r
-          from-[#F3D8B3]
-          to-[#FDBD4]
-          rounded-lg
-          animate-pulse
-          mb-6
-          "
-                            />
-
-
-
-                            {[...Array(6)].map((_, i) => (
-
-                                <div
-                                    key={i}
-                                    className="
-            h-5
-            bg-gradient-to-r
-            from-[#F3D8B3]
-            to-[#FDBD4]
-            rounded
-            animate-pulse
-            mb-4
-            "
-                                />
-
-                            ))}
-
-
-                        </div>
-
-
-
-                    </div>
-
-
                 </div>
-
-
             </section>
         );
     }
+
     return (
-        <section className="py-10 md:py-20 bg-slate-50">
+        <section className="py-10 md:py-20 bg-[#f8fafc]">
             <script
                 type="application/ld+json"
                 dangerouslySetInnerHTML={{
@@ -1001,128 +760,38 @@ ${product?.desc}
                 }}
             />
             <div className="container-custom">
-                <div className="mb-6 text-sm text-slate-500">
-                    Home / Products / {product.title}
+                <div className="mb-6 text-sm text-[#64748b]">
+                    Home / Products / <span className="text-[#0f172a] font-semibold">{product.title}</span>
                 </div>
-                {/* Top Section */}
 
+                {/* Top Section */}
                 <div className="grid lg:grid-cols-2 gap-12">
                     {/* Product Image */}
-
                     <div>
-
-                        <div
-                            className="
-  relative
-  h-[340px]
-  overflow-hidden
-  rounded-[28px]
-  border
-  border-[#E8D3BC]
-  bg-gradient-to-b
-  from-[#FFF9EF]
-  to-white
-  shadow-xl
-  shadow-[#C05800]/10
-  sm:h-[420px]
-  md:h-[500px]
-  lg:h-[540px]
-  "
-                        >
-
-
+                        <div className="relative h-[340px] overflow-hidden rounded-[28px] border border-slate-200 bg-gradient-to-b from-[#f8fafc] to-white shadow-xl shadow-indigo-500/5 sm:h-[420px] md:h-[500px] lg:h-[540px]">
                             {/* Premium Badge */}
-
-                            <div
-                                className="
-    absolute
-    left-5
-    top-5
-    z-20
-    rounded-full
-    bg-gradient-to-r
-    from-[#713600]
-    to-[#C05800]
-    px-4
-    py-2
-    text-xs
-    font-semibold
-    text-white
-    shadow-lg
-    "
-                            >
-
-                                Premium Quality
-
+                            <div className="absolute left-5 top-5 z-20 rounded-full bg-[#3652BA] px-4 py-1.5 text-xs font-bold text-white shadow-md">
+                                Certified Equipment
                             </div>
 
-
-
                             {selectedMedia === "video" && product.video ? (
-
-
-                                <video
-                                    controls
-                                    autoPlay
-                                    className="h-full w-full object-contain p-6"
-                                >
-
-                                    <source
-                                        src={product.video}
-                                        type="video/mp4"
-                                    />
-
+                                <video controls autoPlay className="h-full w-full object-contain p-6">
+                                    <source src={product.video} type="video/mp4" />
                                 </video>
-
-
                             ) : (
-
-
                                 <>
-
-
                                     {/* Loading Skeleton */}
-
                                     {!imageLoaded && (
-
-                                        <div
-                                            className="
-          absolute
-          inset-0
-          flex
-          items-center
-          justify-center
-          bg-gradient-to-br
-          from-[#F3D8B3]
-          via-white
-          to-[#FDBD4]
-          animate-pulse
-          "
-                                        >
-
-                                            <div
-                                                className="
-            h-20
-            w-20
-            rounded-full
-            border-4
-            border-[#E8CFA8]
-            border-t-[#713600]
-            animate-spin
-            "
-                                            />
-
+                                        <div className="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-[#eef2ff] via-white to-slate-50 animate-pulse">
+                                            <div className="h-16 w-16 rounded-full border-4 border-indigo-200 border-t-[#3652BA] animate-spin" />
                                         </div>
-
                                     )}
-
-
 
                                     {/* Product Image */}
                                     {(selectedImage || product.image || product.imgUrl || product.imageUrl || (Array.isArray(product.images) && product.images[0])) && (selectedImage || product.image || product.imgUrl || product.imageUrl || (Array.isArray(product.images) && product.images[0])) !== "/logo.png" ? (
                                         <Image
                                             src={selectedImage || product.image || product.imgUrl || product.imageUrl || (Array.isArray(product.images) && product.images[0])}
-                                            alt={product.title || "Product"}
+                                            alt={product.title || ""}
                                             fill
                                             priority
                                             onLoad={() => setImageLoaded(true)}
@@ -1130,11 +799,11 @@ ${product?.desc}
                                         />
                                     ) : (
                                         <div className="flex h-full w-full flex-col items-center justify-center p-8 text-center">
-                                            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-white border border-[#E8CFA8] text-[#C05800] shadow-md">
+                                            <div className="flex h-20 w-20 items-center justify-center rounded-3xl bg-[#eef2ff] border border-indigo-100 text-[#3652BA] shadow-sm">
                                                 <Microscope size={38} />
                                             </div>
-                                            <span className="mt-4 text-sm font-bold uppercase tracking-wider text-[#713600]">
-                                                {product.category || "Biomedical Analyzer"}
+                                            <span className="mt-4 text-sm font-bold uppercase tracking-wider text-[#0f172a]">
+                                                {product.category || ""}
                                             </span>
                                         </div>
                                     )}
@@ -1142,6 +811,7 @@ ${product?.desc}
                             )}
                         </div>
 
+                        {/* Thumbnails */}
                         <div className="mt-6 flex flex-wrap gap-4">
                             {((Array.isArray(product.images) && product.images.length > 0)
                                 ? product.images
@@ -1153,11 +823,11 @@ ${product?.desc}
                                         setSelectedImage(img);
                                         setSelectedMedia("image");
                                     }}
-                                    className={`group relative h-20 w-20 overflow-hidden rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg
-      ${selectedMedia === "image" && selectedImage === img
-                                            ? "border-[#C05800] shadow-lg shadow-[#C05800]/20"
-                                            : "border-[#E8CFA8] hover:border-[#C05800]"
-                                        }`}
+                                    className={`group relative h-20 w-20 overflow-hidden rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
+                                        selectedMedia === "image" && selectedImage === img
+                                            ? "border-[#3652BA] shadow-lg shadow-indigo-500/20"
+                                            : "border-slate-200 hover:border-[#3652BA]"
+                                    }`}
                                 >
                                     <Image
                                         src={img}
@@ -1169,135 +839,54 @@ ${product?.desc}
                                 </button>
                             ))}
 
-                            {/* Video */}
-
                             {product.video && (
-
                                 <button
                                     onClick={() => setSelectedMedia("video")}
-                                    className={`group flex h-20 w-20 flex-col items-center justify-center rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg
-
-      ${selectedMedia === "video"
-                                            ? "border-#E8CFA8 bg-#E8CFA80 shadow-lg shadow-#E8CFA8"
-                                            : "border-#E8CFA8 hover:border-#E8CFA8 hover:bg-#E8CFA80"
-                                        }`}
+                                    className={`group flex h-20 w-20 flex-col items-center justify-center rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
+                                        selectedMedia === "video"
+                                            ? "border-[#3652BA] bg-indigo-50 shadow-md"
+                                            : "border-slate-200 hover:border-[#3652BA] hover:bg-slate-50"
+                                    }`}
                                 >
-
-                                    <FaPlay
-                                        size={20}
-                                        className="text-green-600"
-                                    />
-
-                                    <span className="mt-2 text-xs font-medium text-slate-700">
-
-                                        Video
-
-                                    </span>
-
+                                    <FaPlay size={18} className="text-[#3652BA]" />
+                                    <span className="mt-1.5 text-xs font-semibold text-[#0f172a]">Video</span>
                                 </button>
-
                             )}
 
-                            {/* PDF */}
-
                             {product.pdf && (
-
                                 <a
                                     href={product.pdf}
                                     target="_blank"
                                     rel="noopener noreferrer"
-                                    className="group flex h-20 w-20 flex-col items-center justify-center rounded-2xl border-2 border-#E8CFA8 transition-all duration-300 hover:-translate-y-1 hover:border-#E8CFA8 hover:bg-#E8CFA80 hover:shadow-lg"
+                                    className="group flex h-20 w-20 flex-col items-center justify-center rounded-2xl border-2 border-slate-200 transition-all duration-300 hover:-translate-y-1 hover:border-[#3652BA] hover:bg-indigo-50 hover:shadow-lg"
                                 >
-
-                                    <span className="text-2xl">
-
-                                        📄
-
-                                    </span>
-
-                                    <span className="mt-2 text-xs font-medium text-slate-700">
-
-                                        PDF
-
-                                    </span>
-
+                                    <span className="text-xl">📄</span>
+                                    <span className="mt-1.5 text-xs font-semibold text-[#0f172a]">PDF</span>
                                 </a>
-
                             )}
-
                         </div>
-
                     </div>
 
-                    {/* Product Details */}
-
+                    {/* Product Details Header */}
                     <div>
-
                         <div className="relative flex items-start justify-between gap-4">
-
-
-                            {/* Product Title */}
-
                             <div>
-
-                                <span
-                                    className="
-            inline-flex
-            rounded-full
-            border
-            border-[#C05800]/30
-            bg-[#FFF9EF]
-            px-4
-            py-1.5
-            text-xs
-            font-bold
-            uppercase
-            tracking-wider
-            text-[#C05800]
-            shadow-sm
-            "
-                                >
-                                    {product.subCategory && product.subCategory !== product.category
+                                <span className="inline-flex rounded-full border border-indigo-200 bg-[#eef2ff] px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-[#3652BA] shadow-xs">
+                                    {product.subCategory && product.category && product.subCategory !== product.category
                                         ? `${product.category} • ${product.subCategory}`
-                                        : product.category || "Biomedical Equipment"}
+                                        : product.category || ""}
                                 </span>
 
-
-                                <h1
-                                    className="
-            mt-4
-            text-2xl
-            font-black
-            leading-tight
-            text-[#38240D]
-            sm:text-3xl
-            md:text-4xl
-            lg:text-5xl
-            "
-                                >
-
+                                <h1 className="mt-4 text-2xl font-black leading-tight text-[#0f172a] sm:text-3xl md:text-4xl lg:text-5xl">
                                     {product.title}
-
                                 </h1>
-
-                                {/* Dynamic Price & Availability from Admin (Commented out as requested) */}
-                                {/* {product.price && String(product.price).trim() && (
-                                    <div className="mt-3.5 flex items-center gap-3">
-                                        <span className="text-2xl sm:text-3xl font-black text-[#C05800]">
-                                            ₹ {product.price}
-                                        </span>
-                                        <span className="rounded-full bg-emerald-50 border border-emerald-200 px-3 py-1 text-xs font-bold text-emerald-700">
-                                            {product.availability || product.status || "In Stock"}
-                                        </span>
-                                    </div>
-                                )} */}
 
                                 {/* Download Brochure Button */}
                                 <div className="mt-6 flex flex-wrap gap-4">
                                     <button
                                         onClick={handleDownloadBrochure}
                                         disabled={downloadingBrochure}
-                                        className="group inline-flex items-center gap-2.5 rounded-2xl bg-[#C05800] px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-[#C05800]/25 transition-all duration-300 hover:-translate-y-1 hover:bg-[#E06D00] hover:shadow-xl hover:shadow-[#C05800]/35 disabled:cursor-not-allowed disabled:opacity-75"
+                                        className="group inline-flex items-center gap-2.5 rounded-2xl bg-[#3652BA] px-6 py-3.5 text-sm font-bold text-white shadow-lg shadow-indigo-600/25 transition-all duration-300 hover:-translate-y-1 hover:bg-[#283d99] hover:shadow-xl hover:shadow-indigo-600/35 disabled:cursor-not-allowed disabled:opacity-75"
                                     >
                                         {downloadingBrochure ? (
                                             <>
@@ -1317,592 +906,143 @@ ${product?.desc}
                                         )}
                                     </button>
                                 </div>
-
                             </div>
 
-
-
-
-                            {/* Share */}
-
-                            <div
-                                ref={shareRef}
-                                className="relative flex-shrink-0"
-                            >
-
-
+                            {/* Share Menu */}
+                            <div ref={shareRef} className="relative flex-shrink-0">
                                 <button
                                     onClick={handleNativeShare}
-                                    className="
-            group
-            flex
-            h-12
-            w-12
-            items-center
-            justify-center
-            rounded-full
-            border
-            border-[#E8CFA8]
-            bg-white
-            text-[#713600]
-            shadow-lg
-            shadow-[#E8CFA8]
-            transition-all
-            duration-300
-            hover:-translate-y-1
-            hover:border-[#C05800]
-            hover:bg-[#FDBD4]
-            hover:text-[#C05800]
-            hover:shadow-xl
-            "
+                                    className="group flex h-12 w-12 items-center justify-center rounded-full border border-slate-200 bg-white text-[#0f172a] shadow-md transition-all duration-300 hover:-translate-y-1 hover:border-[#3652BA] hover:bg-[#eef2ff] hover:text-[#3652BA]"
                                     aria-label="Share Product"
                                 >
-
-                                    <FaShareAlt
-                                        size={18}
-                                        className="
-                transition-transform
-                duration-300
-                group-hover:rotate-12
-                "
-                                    />
-
+                                    <FaShareAlt size={18} className="transition-transform duration-300 group-hover:rotate-12" />
                                 </button>
 
-
-
-
                                 {showShare && (
-
-                                    <div
-                                        className="
-                absolute
-                right-0
-                top-14
-                z-50
-                w-60
-                overflow-hidden
-                rounded-2xl
-                border
-                border-[#E8CFA8]
-                bg-white
-                p-2
-                shadow-2xl
-                shadow-[#E8CFA8]
-                "
-                                    >
-
-
-
+                                    <div className="absolute right-0 top-14 z-50 w-60 overflow-hidden rounded-2xl border border-slate-200 bg-white p-2 shadow-2xl">
                                         <button
                                             onClick={handleCopy}
-                                            className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-xl
-                    px-4
-                    py-3
-                    text-left
-                    text-[#6B5845]
-                    transition
-                    hover:bg-[#FDBD4]
-                    hover:text-[#713600]
-                    "
+                                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[#475569] transition hover:bg-[#eef2ff] hover:text-[#3652BA]"
                                         >
-
-                                            <FaLink className="text-[#713600]" />
-
+                                            <FaLink className="text-[#3652BA]" />
                                             Copy Link
-
                                         </button>
-
-
-
 
                                         <button
                                             onClick={handleWhatsapp}
-                                            className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-xl
-                    px-4
-                    py-3
-                    text-left
-                    text-[#6B5845]
-                    transition
-                    hover:bg-[#FDBD4]
-                    hover:text-[#713600]
-                    "
+                                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[#475569] transition hover:bg-[#eef2ff] hover:text-[#25D366]"
                                         >
-
-                                            <FaWhatsapp className="text-[#713600]" />
-
+                                            <FaWhatsapp className="text-[#25D366]" />
                                             WhatsApp
-
                                         </button>
-
-
-
 
                                         <button
                                             onClick={handleFacebook}
-                                            className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-xl
-                    px-4
-                    py-3
-                    text-left
-                    text-[#6B5845]
-                    transition
-                    hover:bg-[#FDBD4]
-                    hover:text-[#713600]
-                    "
+                                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[#475569] transition hover:bg-[#eef2ff] hover:text-[#1877F2]"
                                         >
-
-                                            <FaFacebook className="text-[#C05800]" />
-
+                                            <FaFacebook className="text-[#1877F2]" />
                                             Facebook
-
                                         </button>
-
-
-
 
                                         <button
                                             onClick={handleInstagram}
-                                            className="
-                    flex
-                    w-full
-                    items-center
-                    gap-3
-                    rounded-xl
-                    px-4
-                    py-3
-                    text-left
-                    text-[#6B5845]
-                    transition
-                    hover:bg-[#FDBD4]
-                    hover:text-[#713600]
-                    "
+                                            className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left text-[#475569] transition hover:bg-[#eef2ff] hover:text-[#E4405F]"
                                         >
-
-                                            <FaInstagram className="text-[#C05800]" />
-
+                                            <FaInstagram className="text-[#E4405F]" />
                                             Instagram
-
                                         </button>
-
-
-
                                     </div>
-
                                 )}
-
-
                             </div>
-
-
                         </div>
-                        {specificationsList.length > 0 && (
-                            <div
-                                className="
-      mt-6
-      rounded-[30px]
-      border
-      border-[#E8CFA8]
-      bg-white
-      p-6
-      shadow-xl
-      shadow-[#E8CFA8]/30
-      md:mt-8
-      md:p-8
-      "
-                            >
-
-                                <h3
-                                    className="
-          mb-6
-          text-2xl
-          font-bold
-          text-[#38240D]
-          "
-                                >
-                                    Product Specifications
-                                </h3>
-
-                                <div className="grid gap-4 sm:grid-cols-2">
-                                    {specificationsList.map((item, index) => (
-                                        <div
-                                            key={index}
-                                            className="
-                    rounded-2xl
-                    border
-                    border-[#E8CFA8]
-                    bg-gradient-to-br
-                    from-[#FFF9EF]
-                    to-white
-                    p-4
-                    transition-all
-                    duration-300
-                    hover:border-[#C05800]
-                    hover:shadow-lg
-                    hover:shadow-[#C05800]/10
-                    "
-                                        >
-                                            <p
-                                                className="
-                      text-xs
-                      font-bold
-                      uppercase
-                      tracking-wider
-                      text-[#C05800]
-                      "
-                                            >
-                                                {item.label}
-                                            </p>
-
-                                            <p
-                                                className="
-                      mt-1.5
-                      text-base
-                      font-bold
-                      text-[#38240D]
-                      break-words
-                      "
-                                            >
-                                                {item.value}
-                                            </p>
-                                        </div>
-                                    ))}
-                                </div>
-
-                            </div>
-                        )}
 
                     </div>
-
                 </div>
 
-                {/* Description + Form */}
-
-                <div className="mt-16">
-                    <div className="grid grid-cols-1 lg:grid-cols-[500px_1fr] xl:grid-cols-[600px_1fr] gap-6 md:gap-8">
-
+                {/* Description + Form Section */}
+                <div className="mt-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-[500px_1fr] xl:grid-cols-[600px_1fr] gap-4 md:gap-6">
                         {/* Quote Form */}
-
-                        <div
-                            className="
-  h-fit
-  rounded-[32px]
-  border
-  border-[#E8CFA8]
-  bg-white
-  p-5
-  shadow-xl
-  shadow-[#E8CFA8]
-  lg:sticky
-  lg:top-24
-  sm:p-6
-  md:p-8
-  "
-                        >
-
-                            {/* Header */}
-
-                            <span
-                                className="
-      inline-flex
-      rounded-full
-      bg-gradient-to-r
-      from-[#FDBD4]
-      to-[#F3D8B3]
-      px-4
-      py-2
-      text-sm
-      font-semibold
-      text-[#713600]
-      "
-                            >
-
+                        <div className="h-fit rounded-[32px] border border-slate-200 bg-white p-5 shadow-xl shadow-indigo-500/5 lg:sticky lg:top-24 sm:p-6 md:p-8">
+                            <span className="inline-flex rounded-full bg-[#eef2ff] border border-indigo-200 px-4 py-1.5 text-xs font-bold text-[#3652BA] uppercase tracking-wider">
                                 Quick Enquiry
-
                             </span>
 
-
-
-                            <h2
-                                className="
-      mt-5
-      text-2xl
-      font-black
-      text-[#38240D]
-      md:text-3xl
-      "
-                            >
-
+                            <h2 className="mt-5 text-2xl font-black text-[#0f172a] md:text-3xl">
                                 Request A Quote
-
                             </h2>
 
-
-
-                            <p
-                                className="
-      mt-3
-      leading-7
-      text-[#6B5845]
-      "
-                            >
-
-                                Product:
-
-                                <span
-                                    className="
-          ml-2
-          font-semibold
-          text-[#C05800]
-          "
-                                >
-
-                                    {product.title}
-
-                                </span>
-
+                            <p className="mt-3 leading-7 text-[#64748b]">
+                                Product: <span className="ml-1 font-semibold text-[#3652BA]">{product.title}</span>
                             </p>
 
-
-
-
-                            {/* Form */}
-
-                            <form
-                                onSubmit={handleSubmit}
-                                className="mt-8 space-y-5"
-                            >
-
-
-
-                                {/* Name */}
-
+                            <form onSubmit={handleSubmit} className="mt-8 space-y-5">
                                 <input
                                     type="text"
                                     placeholder="Your Name"
                                     value={form.name}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            name: e.target.value,
-                                        })
-                                    }
-                                    className="
-          w-full
-          rounded-2xl
-          border
-          border-[#E8CFA8]
-          bg-[#FDBD4]
-          px-5
-          py-4
-          text-[#38240D]
-          outline-none
-          transition-all
-          duration-300
-          placeholder:text-[#8A735A]
-          focus:border-[#C05800]
-          focus:bg-white
-          focus:ring-4
-          focus:ring-[#F3D8B3]
-          "
+                                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                                    className="w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-5 py-4 text-[#0f172a] outline-none transition-all focus:border-[#3652BA] focus:bg-white focus:ring-4 focus:ring-[#3652BA]/15"
+                                    required
                                 />
-
-
-
-
-                                {/* Email */}
 
                                 <input
                                     type="email"
                                     placeholder="Email Address"
                                     value={form.email}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            email: e.target.value,
-                                        })
-                                    }
-                                    className="
-          w-full
-          rounded-2xl
-          border
-          border-[#E8CFA8]
-          bg-[#FDBD4]
-          px-5
-          py-4
-          text-[#38240D]
-          outline-none
-          transition-all
-          duration-300
-          placeholder:text-[#8A735A]
-          focus:border-[#C05800]
-          focus:bg-white
-          focus:ring-4
-          focus:ring-[#F3D8B3]
-          "
+                                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                                    className="w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-5 py-4 text-[#0f172a] outline-none transition-all focus:border-[#3652BA] focus:bg-white focus:ring-4 focus:ring-[#3652BA]/15"
+                                    required
                                 />
-
-
-
-
-                                {/* Phone */}
 
                                 <input
                                     type="tel"
                                     placeholder="Phone Number"
                                     maxLength={10}
                                     value={form.phone}
-                                    onChange={(e) =>
-                                        setForm({
-                                            ...form,
-                                            phone: e.target.value.replace(/\D/g, ""),
-                                        })
-                                    }
-                                    className="
-          w-full
-          rounded-2xl
-          border
-          border-[#E8CFA8]
-          bg-[#FDBD4]
-          px-5
-          py-4
-          text-[#38240D]
-          outline-none
-          transition-all
-          duration-300
-          placeholder:text-[#8A735A]
-          focus:border-[#C05800]
-          focus:bg-white
-          focus:ring-4
-          focus:ring-[#F3D8B3]
-          "
+                                    onChange={(e) => setForm({ ...form, phone: e.target.value.replace(/\D/g, "") })}
+                                    className="w-full rounded-2xl border border-slate-200 bg-[#f8fafc] px-5 py-4 text-[#0f172a] outline-none transition-all focus:border-[#3652BA] focus:bg-white focus:ring-4 focus:ring-[#3652BA]/15"
+                                    required
                                 />
-
-
-
-
-                                {/* Button */}
 
                                 <button
                                     type="submit"
                                     disabled={submitting}
-                                    className="
-          w-full
-          rounded-2xl
-          bg-gradient-to-r
-          from-[#713600]
-          to-[#C05800]
-          py-4
-          font-semibold
-          text-white
-          shadow-lg
-          shadow-[#E8CFA8]
-          transition-all
-          duration-300
-          hover:-translate-y-1
-          hover:from-[#38240D]
-          hover:to-[#713600]
-          hover:shadow-xl
-          hover:shadow-[#C05800]
-          disabled:cursor-not-allowed
-          disabled:opacity-70
-          "
+                                    className="w-full rounded-2xl bg-[#3652BA] py-4 font-bold text-white shadow-lg transition-all duration-300 hover:bg-[#283d99] hover:shadow-xl hover:shadow-indigo-500/25 disabled:cursor-not-allowed disabled:opacity-70"
                                 >
-
                                     {submitting ? "Submitting..." : "Get Quote"}
-
                                 </button>
-
-
                             </form>
-
-
                         </div>
-                        {/* Description */}
 
-                        <div className="rounded-[32px] border border-#E8CFA8 bg-white p-5 shadow-xl shadow-#E8CFA8-100 sm:p-6 md:p-10">
-
-                            {/* Header */}
-
-                            <span
-                                className="
-  inline-flex
-  rounded-full
-  bg-gradient-to-r
-  from-[#FDBD4]
-  to-[#F3D8B3]
-  px-4
-  py-2
-  text-sm
-  font-semibold
-  text-[#713600]
-  "
-                            >
-
+                        {/* Description & Detailed Specs */}
+                        <div className="rounded-[32px] border border-slate-200 bg-white p-5 shadow-xl shadow-slate-100 sm:p-6 md:p-10">
+                            <span className="inline-flex rounded-full bg-[#eef2ff] border border-indigo-200 px-4 py-1.5 text-xs font-bold text-[#3652BA] uppercase tracking-wider">
                                 Product Details
-
                             </span>
 
-
-                            <h3
-                                className="
-  mt-5
-  text-2xl
-  font-black
-  text-[#38240D]
-  md:text-3xl
-  "
-                            >
-
+                            <h3 className="mt-5 text-2xl font-black text-[#0f172a] md:text-3xl">
                                 Product Description
-
                             </h3>
 
-
-                            <p
-                                className="
-  mt-6
-  text-base
-  leading-8
-  text-[#6B5845]
-  md:text-lg
-  md:leading-9
-  "
-                            >
-
-                                {product.desc ||
-                                    product.description ||
-                                    "No description available."}
-
+                            <p className="mt-6 text-base leading-8 text-[#64748b] md:text-lg md:leading-9">
+                                {product.desc || product.description || ""}
                             </p>
+
                             {/* Specifications Table */}
                             {specificationsList.length > 0 && (
-                                <div className="mt-10 overflow-x-auto rounded-2xl border border-[#E8D3BC]">
+                                <div className="mt-10 overflow-x-auto rounded-2xl border border-slate-200">
                                     <table className="w-full border-collapse">
                                         <tbody>
                                             {specificationsList.map((item, index) => (
                                                 <tr
                                                     key={index}
-                                                    className="border-b border-[#E8D3BC]/60 last:border-b-0 transition hover:bg-[#FFF9EF]"
+                                                    className="border-b border-slate-100 last:border-b-0 transition hover:bg-[#eef2ff]/40"
                                                 >
-                                                    <td className="w-1/3 bg-[#FFF9EF]/80 px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-[#C05800]">
+                                                    <td className="w-1/3 bg-[#eef2ff]/70 px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-[#3652BA]">
                                                         {item.label}
                                                     </td>
-                                                    <td className="px-5 py-3.5 text-sm font-semibold text-[#38240D]">
+                                                    <td className="px-5 py-3.5 text-sm font-semibold text-[#0f172a]">
                                                         {item.value}
                                                     </td>
                                                 </tr>
@@ -1912,51 +1052,17 @@ ${product?.desc}
                                 </div>
                             )}
 
-
                             {/* SEO Content */}
-
-                            <div
-                                className="
-  mt-12
-  rounded-[32px]
-  border
-  border-[#E8CFA8]
-  bg-white
-  p-6
-  shadow-xl
-  shadow-[#E8CFA8]
-  md:p-10
-  "
-                            >
-
-                                <span
-                                    className="
-      inline-flex
-      rounded-full
-      bg-gradient-to-r
-      from-[#FDBD4]
-      to-[#F3D8B3]
-      px-4
-      py-2
-      text-sm
-      font-semibold
-      text-[#713600]
-      "
-                                >
-
+                            <div className="mt-12 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-10">
+                                <span className="inline-flex rounded-full bg-[#eef2ff] border border-indigo-200 px-4 py-1.5 text-xs font-bold text-[#3652BA] uppercase tracking-wider">
                                     Product Information
-
                                 </span>
 
-
-
                                 <div className="mt-8 space-y-8">
-
-
                                     {[
                                         {
                                             title: `Why Choose Raj Biosis in ${cityName}?`,
-                                            content: `Raj Biosis Private Limited  is a trusted supplier and distributor of ${product.title} in ${cityName}. We provide high-quality biomedical and laboratory equipment for hospitals, pathology laboratories, diagnostic centres and healthcare facilities.`,
+                                            content: `Raj Biosis Private Limited is a trusted supplier and distributor of ${product.title} in ${cityName}. We provide high-quality biomedical and laboratory equipment for hospitals, pathology laboratories, diagnostic centres and healthcare facilities.`,
                                         },
                                         {
                                             title: `Features of ${product.title}`,
@@ -1987,120 +1093,32 @@ ${product?.desc}
                                             content: `The price of ${product.title} depends on the selected model, specifications and configuration. Contact our team for the latest quotation, availability and delivery information.`,
                                         },
                                     ].map((item, index) => (
-
                                         <div
                                             key={index}
-                                            className="
-                rounded-2xl
-                border
-                border-[#E8CFA8]
-                bg-gradient-to-br
-                from-[#FDBD4]
-                to-white
-                p-6
-                transition-all
-                duration-300
-                hover:border-[#C05800]
-                hover:shadow-lg
-                hover:shadow-[#E8CFA8]
-                "
+                                            className="rounded-2xl border border-slate-200 bg-[#f8fafc] p-6 transition-all duration-300 hover:border-[#3652BA] hover:shadow-md"
                                         >
-
-
-                                            <h3
-                                                className="
-                  text-2xl
-                  font-bold
-                  text-[#38240D]
-                  "
-                                            >
-
+                                            <h3 className="text-xl font-bold text-[#0f172a]">
                                                 {item.title}
-
                                             </h3>
-
-
-
-                                            <p
-                                                className="
-                  mt-4
-                  leading-8
-                  text-[#6B5845]
-                  "
-                                            >
-
+                                            <p className="mt-3 leading-7 text-[#64748b]">
                                                 {item.content}
-
                                             </p>
-
-
                                         </div>
-
-
                                     ))}
-
-
                                 </div>
-
-
                             </div>
 
                             {/* FAQ Section */}
-
-                            <div
-                                className="
-  mt-12
-  rounded-[32px]
-  border
-  border-[#E8CFA8]
-  bg-white
-  p-6
-  shadow-xl
-  shadow-[#E8CFA8]
-  md:p-10
-  "
-                            >
-
-                                <span
-                                    className="
-      inline-flex
-      rounded-full
-      bg-gradient-to-r
-      from-[#FDBD4]
-      to-[#F3D8B3]
-      px-4
-      py-2
-      text-sm
-      font-semibold
-      text-[#713600]
-      "
-                                >
-
+                            <div className="mt-12 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-10">
+                                <span className="inline-flex rounded-full bg-[#eef2ff] border border-indigo-200 px-4 py-1.5 text-xs font-bold text-[#3652BA] uppercase tracking-wider">
                                     Help Center
-
                                 </span>
 
-
-
-                                <h3
-                                    className="
-      mt-5
-      text-2xl
-      md:text-3xl
-      font-black
-      text-[#38240D]
-      "
-                                >
-
+                                <h3 className="mt-5 text-2xl md:text-3xl font-black text-[#0f172a]">
                                     Frequently Asked Questions
-
                                 </h3>
 
-
-
                                 <div className="mt-8 space-y-5">
-
-
                                     {[
                                         {
                                             question: `What is ${product.title} used for in ${cityName}?`,
@@ -2139,70 +1157,23 @@ ${product?.desc}
                                             answer: `You can submit the enquiry form on this page or contact our sales team directly for quotations, product information and technical assistance.`,
                                         },
                                     ].map((item, index) => (
-
                                         <div
                                             key={index}
-                                            className="
-                rounded-2xl
-                border
-                border-[#E8CFA8]
-                bg-gradient-to-br
-                from-[#FDBD4]
-                to-white
-                p-6
-                transition-all
-                duration-300
-                hover:-translate-y-1
-                hover:border-[#C05800]
-                hover:shadow-lg
-                hover:shadow-[#E8CFA8]
-                "
+                                            className="rounded-2xl border border-slate-200 bg-[#f8fafc] p-6 transition-all duration-300 hover:border-[#3652BA] hover:shadow-md"
                                         >
-
-
-                                            <h4
-                                                className="
-                  text-lg
-                  font-bold
-                  text-[#38240D]
-                  "
-                                            >
-
+                                            <h4 className="text-lg font-bold text-[#0f172a]">
                                                 {item.question}
-
                                             </h4>
-
-
-
-                                            <p
-                                                className="
-                  mt-3
-                  leading-8
-                  text-[#6B5845]
-                  "
-                                            >
-
+                                            <p className="mt-3 leading-7 text-[#64748b]">
                                                 {item.answer}
-
                                             </p>
-
-
                                         </div>
-
-
                                     ))}
-
-
                                 </div>
-
-
                             </div>
                         </div>
-
                     </div>
-
                 </div>
-
             </div>
         </section>
     );

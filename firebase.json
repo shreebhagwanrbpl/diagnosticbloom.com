@@ -1,6 +1,6 @@
 {
   "apphosting": {
-    "backendId": "clinidixcom",
+    "backendId": "diagnosticbloomcom",
     "rootDir": "/",
     "ignore": [
       "node_modules",

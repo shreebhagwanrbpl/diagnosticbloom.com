@@ -1,4 +1,4 @@
-import { initializeApp } from "firebase/app";
+import { initializeApp, getApps, getApp } from "firebase/app";
 import {
   getFirestore,
   setLogLevel,
@@ -14,8 +14,8 @@ const firebaseConfig = {
   appId: "1:190335913620:web:99a14edcbb528f06c1ee81"
 };
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 export const db = getFirestore(app);
 setLogLevel("silent");
 
-export const auth = getAuth(app);
+export const auth = getAuth(app);
