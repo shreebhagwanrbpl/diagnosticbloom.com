@@ -7,19 +7,35 @@ import { ShieldCheck, ArrowRight, Microscope } from "lucide-react";
 import { makeSlug } from "@/data/productsData";
 
 export default function ProductCard({
-  product,
+  product = {},
+  loading = false,
   makeLink = (p) => p,
 }) {
   const [imgLoaded, setImgLoaded] = useState(false);
   const [imgError, setImgError] = useState(false);
 
+  if (loading) {
+    return (
+      <div className="flex flex-col justify-between overflow-hidden rounded-3xl border border-slate-200 bg-white p-6 shadow-md animate-pulse">
+        <div className="h-48 w-full rounded-2xl bg-slate-100 mb-4" />
+        <div className="h-4 w-1/3 rounded bg-indigo-50 mb-3" />
+        <div className="h-6 w-3/4 rounded bg-slate-200 mb-3" />
+        <div className="space-y-2 mb-6">
+          <div className="h-3.5 w-full rounded bg-slate-100" />
+          <div className="h-3.5 w-4/5 rounded bg-slate-100" />
+        </div>
+        <div className="h-12 w-full rounded-2xl bg-slate-100" />
+      </div>
+    );
+  }
+
   const {
     id,
-    title,
-    category,
-    subCategory,
-    description,
-    desc,
+    title = "",
+    category = "Diagnostic Equipment",
+    subCategory = "",
+    description = "",
+    desc = "",
     specs = {},
     badge,
     status,
@@ -110,6 +126,7 @@ export default function ProductCard({
                 src={image}
                 alt={title || ""}
                 fill
+                loading="lazy"
                 onLoad={() => setImgLoaded(true)}
                 onError={() => setImgError(true)}
                 className={`object-contain p-2 transition-all duration-500 group-hover:scale-105 ${
@@ -119,7 +136,7 @@ export default function ProductCard({
               />
             </>
           ) : (
-            /* Premium Medical Instrument Placeholder */
+            /* Premium Medical Instrument Placeholder (Image Static Fallback) */
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-[#eef2ff] via-[#f8fafc] to-white p-6 text-center">
               <div className="flex h-16 w-16 items-center justify-center rounded-3xl bg-white shadow-md border border-indigo-100 text-[#3652BA] transition-transform duration-300 group-hover:scale-110">
                 <Microscope size={32} />

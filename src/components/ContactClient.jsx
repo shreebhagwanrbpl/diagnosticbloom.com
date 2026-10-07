@@ -1,0 +1,327 @@
+"use client";
+
+import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
+import { doc, getDoc } from "@/lib/client-api";
+import { db } from "@/lib/client-api";
+import PageBanner from "@/components/PageBanner";
+import SectionTitle from "@/components/SectionTitle";
+import ContactForm from "@/components/ContactForm";
+import {
+  Mail,
+  Phone,
+  MapPin,
+  Clock3,
+  ChevronDown,
+  Building,
+  Info,
+} from "lucide-react";
+
+const faqs = [
+  {
+    q: "How fast can I get an official price quote for biomedical equipment?",
+    a: "Our technical consultants review requirements instantly. You will receive an official quotation with spec sheets within 2 hours during working hours.",
+  },
+  {
+    q: "Do your analyzers come with NABL-traceable calibration certificates?",
+    a: "Yes. Every diagnostic system delivered undergoes rigorous calibration and validation tests, accompanied by official NABL-traceable test certificates.",
+  },
+  {
+    q: "What is your emergency breakdown response SLA for hospitals?",
+    a: "We maintain a guaranteed 2-hour field engineer dispatch SLA for critical ICU, OT, and pathology laboratory breakdown emergencies.",
+  },
+  {
+    q: "Do you offer annual maintenance contracts (AMC/CMC)?",
+    a: "Yes. We offer comprehensive AMC and CMC packages covering routine calibration, preventive maintenance visits, and genuine OEM spare parts replacement.",
+  },
+  {
+    q: "Can we request sample testing or live instrument demonstrations?",
+    a: "Absolutely. We arrange live virtual or on-site instrument demonstrations for hospitals and path labs before finalizing procurement.",
+  },
+];
+
+export default function ContactClient({
+  initialContactInfo = [],
+  initialDistrictData = null,
+  city = "",
+}) {
+  const [districtData, setDistrictData] = useState(initialDistrictData);
+  const [contactInfo, setContactInfo] = useState(initialContactInfo);
+  const [loading, setLoading] = useState(!initialContactInfo.length);
+  const [openFaq, setOpenFaq] = useState(null);
+
+  const pathname = usePathname();
+  const pathParts = pathname.split("/").filter(Boolean);
+  const staticRoutes = ["about", "services", "products", "contact", "items"];
+  const currentDistrict =
+    pathParts.length > 0 && !staticRoutes.includes(pathParts[0])
+      ? pathParts[0]
+      : null;
+
+  useEffect(() => {
+    if (initialContactInfo.length > 0) {
+      setLoading(false);
+    }
+
+    let isMounted = true;
+
+    if (!initialContactInfo.length) {
+      const loadContact = async () => {
+        try {
+          const snap = await getDoc(
+            doc(db, "websites", "diagnosticbloomcom", "pages", "contact")
+          );
+          if (isMounted && snap.exists()) {
+            setContactInfo(snap.data().contactInfo || []);
+          }
+        } catch (err) {
+          console.error("Error loading contact data:", err);
+        } finally {
+          if (isMounted) setLoading(false);
+        }
+      };
+      loadContact();
+    }
+
+    return () => {
+      isMounted = false;
+    };
+  }, [initialContactInfo.length]);
+
+  useEffect(() => {
+    if (initialDistrictData || !currentDistrict) return;
+    let isMounted = true;
+    const loadDistrict = async () => {
+      try {
+        const snap = await getDoc(
+          doc(db, "websites", "diagnosticbloomcom", "districts", currentDistrict)
+        );
+        if (isMounted && snap.exists()) {
+          setDistrictData(snap.data());
+        }
+      } catch (err) {
+        console.error("Error loading district data:", err);
+      }
+    };
+
+    loadDistrict();
+    return () => {
+      isMounted = false;
+    };
+  }, [currentDistrict, initialDistrictData]);
+
+  const getFieldIcon = (label = "") => {
+    const l = label.toLowerCase();
+    if (
+      l.includes("phone") ||
+      l.includes("mobile") ||
+      l.includes("tel") ||
+      l.includes("contact")
+    ) {
+      return <Phone size={26} />;
+    }
+    if (l.includes("email") || l.includes("mail")) {
+      return <Mail size={26} />;
+    }
+    if (
+      l.includes("address") ||
+      l.includes("office") ||
+      l.includes("location") ||
+      l.includes("headquarter")
+    ) {
+      return <MapPin size={26} />;
+    }
+    if (
+      l.includes("time") ||
+      l.includes("hour") ||
+      l.includes("clock") ||
+      l.includes("schedule")
+    ) {
+      return <Clock3 size={26} />;
+    }
+    return <Building size={26} />;
+  };
+
+  return (
+    <div className="bg-[#F8FAFC]/40 text-[#0F172A]">
+      {/* Banner */}
+      <PageBanner
+        badge="Get in Touch"
+        title={city ? `Talk to a Biomedical Specialist in ${city}` : "Talk to a Biomedical Specialist"}
+        subtitle="Have questions about diagnostic equipment specs, calibration services, or hospital supply tenders? We are here to help 24/7."
+      />
+
+      {/* Main Grid */}
+      <section className="section-padding bg-gradient-to-b from-white via-[#F8FAFC] to-[#EEF2FF]">
+        <div className="container-custom">
+          <div className="grid lg:grid-cols-12 gap-12 items-start">
+            {/* Left Contact Cards - 100% Dynamic from Firestore */}
+            <div className="lg:col-span-5 space-y-6">
+              <SectionTitle
+                badge="Reach Us Directly"
+                title="Connect with Our Specialists"
+                description="Our dedicated support team and certified field engineers are standing by."
+              />
+
+              <div className="space-y-4 mt-8">
+                {loading ? (
+                  <div className="space-y-4">
+                    {[...Array(3)].map((_, i) => (
+                      <div
+                        key={i}
+                        className="h-28 rounded-3xl bg-[#E0E7FF]/60 animate-pulse"
+                      />
+                    ))}
+                  </div>
+                ) : contactInfo.length === 0 ? (
+                  <div className="rounded-3xl border border-[#C7D2FE] bg-white p-8 text-center text-[#475569]">
+                    <Info size={32} className="mx-auto text-[#3652BA] mb-2" />
+                    <p className="font-semibold">No Contact Information Added</p>
+                    <p className="text-xs mt-1">Please add contact details from the Admin panel.</p>
+                  </div>
+                ) : (
+                  contactInfo.map((item, idx) => {
+                    const label = item?.label?.trim() || "Contact Detail";
+                    const l = label.toLowerCase();
+                    const isPhone =
+                      l.includes("phone") ||
+                      l.includes("mobile") ||
+                      l.includes("tel") ||
+                      l.includes("contact");
+                    const isEmail = l.includes("email") || l.includes("mail");
+                    const isAddress =
+                      l.includes("address") ||
+                      l.includes("office") ||
+                      l.includes("location") ||
+                      l.includes("headquarter");
+
+                    let displayValues = [];
+                    if (Array.isArray(item?.value)) {
+                      displayValues = item.value.filter(
+                        (val) => typeof val === "string" && val.trim() !== ""
+                      );
+                    } else if (
+                      typeof item?.value === "string" &&
+                      item.value.trim() !== ""
+                    ) {
+                      displayValues = [item.value.trim()];
+                    }
+
+                    // District dynamic replacement for address
+                    if (isAddress && districtData) {
+                      displayValues = [
+                        `${districtData.district}, ${districtData.state}, India`,
+                      ];
+                    }
+
+                    if (displayValues.length === 0) return null;
+
+                    return (
+                      <div
+                        key={idx}
+                        className="flex items-start gap-4 rounded-3xl border border-[#C7D2FE] bg-white p-6 shadow-sm transition-all hover:border-[#3652BA]/40 hover:shadow-md"
+                      >
+                        <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E0E7FF] text-[#3652BA] shrink-0">
+                          {getFieldIcon(label)}
+                        </div>
+                        <div className="flex-1">
+                          <h4 className="text-xs font-bold uppercase tracking-wider text-[#475569]">
+                            {label}
+                          </h4>
+                          <div className="mt-2 flex flex-col gap-1.5">
+                            {displayValues.map((val, vIdx) => {
+                              if (isPhone) {
+                                return (
+                                  <a
+                                    key={vIdx}
+                                    href={`tel:${String(val).replace(/\s+/g, "")}`}
+                                    className="text-base sm:text-lg font-bold text-[#0F172A] hover:text-[#3652BA] transition-colors inline-block"
+                                  >
+                                    {val}
+                                  </a>
+                                );
+                              }
+                              if (isEmail) {
+                                return (
+                                  <a
+                                    key={vIdx}
+                                    href={`mailto:${val}`}
+                                    className="text-base font-bold text-[#0F172A] hover:text-[#3652BA] transition-colors inline-block break-all"
+                                  >
+                                    {val}
+                                  </a>
+                                );
+                              }
+                              return (
+                                <p
+                                  key={vIdx}
+                                  className="text-sm sm:text-base font-bold text-[#0F172A] leading-relaxed"
+                                >
+                                  {val}
+                                </p>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </div>
+
+            {/* Right Contact Form */}
+            <div className="lg:col-span-7">
+              <ContactForm
+                title="Send Us an Official Inquiry"
+                subtitle="Fill out the form below and our equipment specialist will get back to you within 2 hours."
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* FAQ Section */}
+      <section className="section-padding bg-white border-t border-[#C7D2FE]/60">
+        <div className="container-custom max-w-4xl">
+          <SectionTitle
+            badge="Frequently Asked Questions"
+            title="Got Questions? We Have Answers"
+            description="Clear answers regarding our procurement terms, calibration standards, warranties, and emergency repair SLAs."
+            center
+          />
+
+          <div className="mt-12 space-y-4">
+            {faqs.map((faq, idx) => {
+              const isOpen = openFaq === idx;
+              return (
+                <div
+                  key={idx}
+                  className="rounded-3xl border border-[#C7D2FE] bg-[#F8FAFC]/60 overflow-hidden transition-all"
+                >
+                  <button
+                    onClick={() => setOpenFaq(isOpen ? null : idx)}
+                    className="w-full flex items-center justify-between p-6 text-left font-bold text-[#0F172A] hover:text-[#3652BA]"
+                  >
+                    <span className="text-base sm:text-lg pr-4">{faq.q}</span>
+                    <ChevronDown
+                      size={20}
+                      className={`shrink-0 text-[#3652BA] transition-transform duration-300 ${isOpen ? "rotate-180" : ""
+                        }`}
+                    />
+                  </button>
+
+                  {isOpen && (
+                    <div className="px-6 pb-6 text-sm sm:text-base leading-relaxed text-[#475569] border-t border-[#C7D2FE]/40 pt-4">
+                      {faq.a}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}

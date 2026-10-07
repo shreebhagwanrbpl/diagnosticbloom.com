@@ -1,4 +1,8 @@
 import ProductDetails from "./ProductDetails";
+import { fetchFullCatalog, fetchContactData } from "@/lib/data-fetcher-server";
+import { makeSlug } from "@/data/productsData";
+
+export const revalidate = 0;
 
 export async function generateMetadata({ params }) {
     const { slug } = await params;
@@ -8,15 +12,12 @@ export async function generateMetadata({ params }) {
         ?.replace(/\b\w/g, (c) => c.toUpperCase());
 
     const title = `${productName} Supplier in India | Price, Dealer & Distributor | Raj Biosis Private Limited`;
-
-    const description = `Buy ${productName} at best price in India. Trusted supplier, dealer and distributor of ${productName} for hospitals, laboratories, diagnostic centers, research institutes and healthcare facilities. Contact Raj Biosis Private Limited  for latest quotation and product details.`;
-
+    const description = `Buy ${productName} at best price in India. Trusted supplier, dealer and distributor of ${productName} for hospitals, laboratories, diagnostic centers, research institutes and healthcare facilities. Contact Raj Biosis Private Limited for latest quotation and product details.`;
     const url = `https://diagnosticbloom.com/items/${slug}`;
 
     return {
         title,
         description,
-
         keywords: [
             productName,
             `${productName} Supplier`,
@@ -42,11 +43,9 @@ export async function generateMetadata({ params }) {
             "Raj Biosis Private Limited",
             "Raj Biosis",
         ],
-
         alternates: {
             canonical: url,
         },
-
         openGraph: {
             title,
             description,
@@ -55,13 +54,11 @@ export async function generateMetadata({ params }) {
             type: "website",
             locale: "en_IN",
         },
-
         twitter: {
             card: "summary_large_image",
             title,
             description,
         },
-
         robots: {
             index: true,
             follow: true,
@@ -73,7 +70,6 @@ export async function generateMetadata({ params }) {
                 "max-snippet": -1,
             },
         },
-
         metadataBase: new URL("https://diagnosticbloom.com"),
     };
 }
@@ -81,5 +77,20 @@ export async function generateMetadata({ params }) {
 export default async function Page({ params }) {
     const { slug } = await params;
 
-    return <ProductDetails slug={slug} />;
+    const [catalog, contactData] = await Promise.all([
+        fetchFullCatalog().catch(() => []),
+        fetchContactData().catch(() => null),
+    ]);
+
+    const initialProduct = Array.isArray(catalog)
+        ? catalog.find((p) => p.slug === slug || makeSlug(p.title) === slug || p.id === slug) || null
+        : null;
+
+    return (
+        <ProductDetails
+            slug={slug}
+            initialProduct={initialProduct}
+            initialContactInfo={contactData?.contactInfo || []}
+        />
+    );
 }

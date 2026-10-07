@@ -1,0 +1,284 @@
+"use client";
+
+import { useEffect, useState, useMemo, Suspense } from "react";
+import { usePathname, useSearchParams } from "next/navigation";
+import PageBanner from "@/components/PageBanner";
+import SectionTitle from "@/components/SectionTitle";
+import ProductCard from "@/components/ProductCard";
+import { fetchAllDynamicProducts, normalizeProduct } from "@/lib/fetchProducts";
+import { subscribeToCatalog } from "@/lib/client-api";
+import { Search, X, Filter, Package, ShieldCheck, ArrowRight, Loader2 } from "lucide-react";
+
+function ProductsContent({ initialProducts = [], city = "" }) {
+  const [products, setProducts] = useState(initialProducts);
+  const [loading, setLoading] = useState(!initialProducts.length);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All Categories");
+
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const urlCategory = searchParams ? (searchParams.get("category") || searchParams.get("cat")) : null;
+
+  const pathParts = pathname.split("/").filter(Boolean);
+  const staticRoutes = ["about", "services", "items", "contact", "products"];
+  const district =
+    pathParts.length > 0 && !staticRoutes.includes(pathParts[0])
+      ? pathParts[0]
+      : null;
+
+  const makeLink = (path) => {
+    if (!district) return path;
+    if (path === "/") return `/${district}`;
+    if (path.startsWith("/items?")) {
+      return `/${district}${path}`;
+    }
+    return `/${district}${path.startsWith("/") ? path : `/${path}`}`;
+  };
+
+  useEffect(() => {
+    if (initialProducts.length > 0) {
+      setLoading(false);
+    }
+
+    let isMounted = true;
+
+    if (!initialProducts.length) {
+      const loadInitialProducts = async () => {
+        try {
+          const fetched = await fetchAllDynamicProducts();
+          if (isMounted && Array.isArray(fetched)) {
+            setProducts(fetched);
+          }
+        } catch (err) {
+          console.error("Error loading dynamic products:", err);
+        } finally {
+          if (isMounted) setLoading(false);
+        }
+      };
+      loadInitialProducts();
+    }
+
+    // Subscribe to real-time catalog changes from Firestore
+    const unsubscribe = subscribeToCatalog((snap) => {
+      if (isMounted && snap && Array.isArray(snap.docs) && snap.docs.length > 0) {
+        const normalized = snap.docs
+          .map((doc) => normalizeProduct(doc.data()))
+          .filter(Boolean);
+
+        if (normalized.length > 0) {
+          setProducts(normalized);
+        }
+      }
+    });
+
+    return () => {
+      isMounted = false;
+      if (unsubscribe) unsubscribe();
+    };
+  }, [initialProducts.length]);
+
+  const categoriesList = useMemo(() => {
+    const setCat = new Set(["All Categories"]);
+    products.forEach((p) => {
+      if (p.category && String(p.category).trim()) {
+        setCat.add(String(p.category).trim());
+      }
+    });
+    return Array.from(setCat);
+  }, [products]);
+
+  // Sync category from URL search params when changed
+  useEffect(() => {
+    if (urlCategory && typeof urlCategory === "string" && urlCategory.trim()) {
+      const decoded = decodeURIComponent(urlCategory.trim());
+      setSelectedCategory(decoded);
+    }
+  }, [urlCategory]);
+
+  const filteredProducts = useMemo(() => {
+    return products.filter((product) => {
+      const matchesCategory =
+        selectedCategory === "All Categories" ||
+        (product.category && product.category.toLowerCase().trim() === selectedCategory.toLowerCase().trim()) ||
+        (product.subCategory && product.subCategory.toLowerCase().trim() === selectedCategory.toLowerCase().trim());
+
+      const q = searchQuery.toLowerCase().trim();
+      const matchesQuery =
+        !q ||
+        (product.title && product.title.toLowerCase().includes(q)) ||
+        (product.description && product.description.toLowerCase().includes(q)) ||
+        (product.category && product.category.toLowerCase().includes(q)) ||
+        (product.brand && product.brand.toLowerCase().includes(q)) ||
+        (product.model && product.model.toLowerCase().includes(q));
+
+      return matchesCategory && matchesQuery;
+    });
+  }, [products, selectedCategory, searchQuery]);
+
+  return (
+    <div className="bg-[#f8fafc] text-[#0f172a]">
+      {/* Banner */}
+      <PageBanner
+        badge="Product Inventory"
+        title={city ? `Diagnostic Equipment Collection in ${city}` : "Diagnostic Equipment Collection"}
+        subtitle="Explore our certified catalog of clinical chemistry analyzers, hematology counters, PCR systems, patient monitors, and laboratory consumables."
+      />
+
+      {/* Main Catalog Section */}
+      <section className="section-padding bg-gradient-to-b from-white via-[#f8fafc] to-[#eef2ff]">
+        <div className="container-custom">
+          {/* Controls Bar - Sticky directly below Navbar */}
+          <div className="sticky top-20 z-40 rounded-2xl sm:rounded-3xl border border-slate-200 bg-white/95 backdrop-blur-xl p-4 sm:p-5 shadow-lg shadow-black/5 transition-all">
+            <div className="grid gap-4 md:grid-cols-12 items-center">
+              {/* Search Box */}
+              <div className="md:col-span-5 relative">
+                <Search size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-[#3652BA]" />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Search by equipment name, model, or parameter..."
+                  className="w-full rounded-xl border border-slate-200 bg-[#f8fafc] pl-10 pr-10 py-2.5 sm:py-3 text-xs sm:text-sm text-[#0f172a] transition-all focus:border-[#3652BA] focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#3652BA]/20"
+                />
+                {searchQuery && (
+                  <button
+                    onClick={() => setSearchQuery("")}
+                    className="absolute right-3.5 top-1/2 -translate-y-1/2 text-[#64748b] hover:text-[#3652BA]"
+                  >
+                    <X size={16} />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Filter Pills */}
+              <div className="md:col-span-7 flex items-center gap-2 overflow-x-auto pb-1 md:pb-0 scrollbar-none">
+                <Filter size={16} className="text-[#3652BA] shrink-0 mr-1" />
+                {categoriesList.map((cat) => (
+                  <button
+                    key={cat}
+                    onClick={() => setSelectedCategory(cat)}
+                    className={`whitespace-nowrap rounded-xl px-3.5 py-2 text-xs font-bold transition-all ${
+                      selectedCategory.toLowerCase().trim() === cat.toLowerCase().trim()
+                        ? "bg-[#3652BA] !text-white shadow-md shadow-indigo-600/30"
+                        : "bg-[#f8fafc] border border-slate-200 text-[#64748b] hover:bg-indigo-50 hover:text-[#3652BA]"
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Results Count & Clear Button */}
+            <div className="mt-3 flex items-center justify-between border-t border-slate-100 pt-3 text-xs font-semibold text-[#64748b]">
+              <span>
+                Showing <strong className="text-[#3652BA] font-bold">{loading ? "..." : filteredProducts.length}</strong> of {loading ? "..." : products.length} instruments
+                {selectedCategory !== "All Categories" && (
+                  <span className="ml-1 text-[#3652BA]">in &ldquo;{selectedCategory}&rdquo;</span>
+                )}
+              </span>
+
+              {(selectedCategory !== "All Categories" || searchQuery) && (
+                <button
+                  onClick={() => {
+                    setSelectedCategory("All Categories");
+                    setSearchQuery("");
+                  }}
+                  className="text-[#3652BA] font-bold hover:underline"
+                >
+                  Reset all filters
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Grid of Products / Skeletons */}
+          {loading ? (
+            <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {Array.from({ length: 6 }).map((_, i) => (
+                <ProductCard key={`item-skel-${i}`} loading />
+              ))}
+            </div>
+          ) : filteredProducts.length === 0 ? (
+            <div className="mt-16 text-center rounded-3xl border border-slate-200 bg-white p-16 shadow-xs">
+              <Package size={48} className="mx-auto text-[#3652BA]/60 mb-4 animate-bounce" />
+              <h3 className="text-2xl font-bold text-[#0f172a]">No Instruments Found</h3>
+              <p className="mt-2 text-sm text-[#64748b]">
+                Try adjusting your search keyword or selecting a different equipment category.
+              </p>
+              <button
+                onClick={() => {
+                  setSelectedCategory("All Categories");
+                  setSearchQuery("");
+                }}
+                className="mt-6 inline-flex items-center gap-2 rounded-2xl bg-[#3652BA] px-6 py-3 text-sm font-bold !text-white shadow-md hover:bg-[#283d99]"
+              >
+                Clear Search Filters
+              </button>
+            </div>
+          ) : (
+            <div className="mt-12 grid gap-8 md:grid-cols-2 lg:grid-cols-3">
+              {filteredProducts.map((product) => (
+                <ProductCard
+                  key={product.id || product.slug}
+                  product={product}
+                  makeLink={makeLink}
+                />
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* Bulk Procurement Banner */}
+      <section className="section-padding bg-white border-t border-slate-200">
+        <div className="container-custom">
+          <div className="rounded-3xl border border-slate-200 bg-gradient-to-r from-[#f8fafc] via-white to-[#eef2ff] p-8 sm:p-12 shadow-lg">
+            <div className="grid lg:grid-cols-12 gap-8 items-center">
+              <div className="lg:col-span-8">
+                <span className="inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-white px-4 py-1.5 text-xs font-bold text-[#3652BA] uppercase tracking-wider">
+                  <ShieldCheck size={16} className="text-[#3652BA]" /> Bulk Hospital Orders & Tenders
+                </span>
+
+                <h3 className="mt-4 text-3xl font-black text-[#0f172a]">
+                  Procuring Equipment for New Hospital Blocks or Diagnostics Chains?
+                </h3>
+
+                <p className="mt-3 text-base text-[#64748b] leading-relaxed">
+                  We offer institutional discounts, customized equipment leasing plans, and complete turnkey lab setup packages with extended AMC warranties.
+                </p>
+              </div>
+
+              <div className="lg:col-span-4 flex items-center justify-end">
+                <a
+                  href={makeLink("/contact")}
+                  className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-2xl bg-[#3652BA] px-8 py-4 text-base font-bold !text-white shadow-lg transition-all hover:bg-[#283d99]"
+                >
+                  <span className="!text-white font-bold">Request Bulk Tender Quote</span>
+                  <ArrowRight size={18} className="!text-white" />
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+export default function ItemsClient({ initialProducts = [], city = "" }) {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex min-h-[60vh] items-center justify-center bg-[#f8fafc]">
+          <div className="flex flex-col items-center gap-3">
+            <Loader2 className="h-10 w-10 animate-spin text-[#3652BA]" />
+            <p className="text-sm font-bold text-[#3652BA]">Loading Medical Equipment Catalog...</p>
+          </div>
+        </div>
+      }
+    >
+      <ProductsContent initialProducts={initialProducts} city={city} />
+    </Suspense>
+  );
+}

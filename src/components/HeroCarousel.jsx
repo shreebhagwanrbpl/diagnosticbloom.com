@@ -15,11 +15,9 @@ import {
   Image as ImageIcon,
   Film,
   ShieldCheck,
-  Award,
-  Zap,
 } from "lucide-react";
 
-// Default high-quality fallback slides if database has no media configured yet
+// Default high-quality fallback slides if database has no media configured yet (Image static fallback retained as requested)
 const FALLBACK_SLIDES = [
   {
     type: "image",
@@ -41,6 +39,7 @@ const FALLBACK_SLIDES = [
 export default function HeroCarousel({
   homeData = null,
   locationTitle = "",
+  loading = false,
   makeLink = (path) => path,
 }) {
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -130,13 +129,13 @@ export default function HeroCarousel({
   const dbSlides = parseMediaList(homeData);
   const slides = dbSlides.length > 0 ? dbSlides : FALLBACK_SLIDES;
 
-  // Hero copy from Firestore
-  const heroTitle = homeData?.title?.trim() || "Advanced Biomedical & Diagnostic Equipment Solutions";
-  const heroDescription =
-    homeData?.description?.trim() ||
-    "Delivering precision hematology analyzers, fully automated biochemistry systems, NABL-traceable calibration standards, and 24/7 technical field engineering support across India.";
-  const btn1Text = homeData?.button1Text?.trim() || "Explore Equipment";
-  const btn2Text = homeData?.button2Text?.trim() || "Get Instant Quote";
+  // Purely dynamic title & description — NO static fallback text as requested
+  const heroTitle = (homeData?.title || "").trim();
+  const heroDescription = (homeData?.description || "").trim();
+
+  // Button texts are purely dynamic from Admin CMS, links remain static
+  const btn1Text = (homeData?.button1Text || homeData?.btn1Text || "").trim();
+  const btn2Text = (homeData?.button2Text || homeData?.btn2Text || "").trim();
 
   const btn1Href = makeLink("/items");
   const btn2Href = makeLink("/contact");
@@ -221,7 +220,7 @@ export default function HeroCarousel({
             <motion.div
               initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
+              transition={{ duration: 0.4 }}
               className="inline-flex items-center gap-2 self-start rounded-full border border-indigo-400/30 bg-slate-900/80 px-4 py-1.5 text-xs font-bold uppercase tracking-wider text-indigo-200 shadow-md backdrop-blur-md"
             >
               <Sparkles size={14} className="text-indigo-400 animate-pulse" />
@@ -232,59 +231,81 @@ export default function HeroCarousel({
               </span>
             </motion.div>
 
-            {/* Main Heading */}
-            <motion.h1
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.1 }}
-              className="mt-4 text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-[1.12] tracking-tight"
-            >
-              {heroTitle}
-            </motion.h1>
+            {/* Shimmer Loading Skeleton while dynamic data is loading */}
+            {loading && !heroTitle ? (
+              <div className="mt-5 space-y-4 animate-pulse">
+                <div className="h-10 sm:h-12 w-11/12 rounded-2xl bg-slate-800/80" />
+                <div className="h-10 sm:h-12 w-3/4 rounded-2xl bg-slate-800/80" />
+                <div className="h-4 w-full rounded bg-slate-800/60 mt-4" />
+                <div className="h-4 w-5/6 rounded bg-slate-800/60" />
+                <div className="flex gap-4 mt-6">
+                  <div className="h-12 w-40 rounded-2xl bg-slate-800" />
+                  <div className="h-12 w-40 rounded-2xl bg-slate-800" />
+                </div>
+              </div>
+            ) : (
+              <>
+                {/* Dynamic Main Heading (Purely dynamic, no static fallback) */}
+                {heroTitle ? (
+                  <motion.h1
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.1 }}
+                    className="mt-4 text-3xl sm:text-4xl lg:text-5xl font-black text-white leading-[1.12] tracking-tight"
+                  >
+                    {heroTitle}
+                  </motion.h1>
+                ) : null}
 
-            {/* Description */}
-            <motion.p
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.2 }}
-              className="mt-4 text-sm sm:text-base lg:text-lg text-slate-300 leading-relaxed max-w-xl"
-            >
-              {heroDescription}
-            </motion.p>
+                {/* Dynamic Description (Purely dynamic, no static fallback) */}
+                {heroDescription ? (
+                  <motion.p
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.2 }}
+                    className="mt-4 text-sm sm:text-base lg:text-lg text-slate-300 leading-relaxed max-w-xl"
+                  >
+                    {heroDescription}
+                  </motion.p>
+                ) : null}
 
-            {/* Action Buttons */}
-            <motion.div
-              initial={{ opacity: 0, y: 15 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: 0.3 }}
-              className="mt-8 flex flex-wrap items-center gap-4"
-            >
-              {btn1Text && (
-                <Link
-                  href={btn1Href}
-                  className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-[#3652BA] !text-white px-7 py-3.5 text-sm font-bold shadow-xl shadow-indigo-600/30 transition-all duration-300 hover:bg-[#283d99] hover:shadow-2xl hover:-translate-y-0.5 border border-indigo-400/30"
-                >
-                  <span className="!text-white font-bold">{btn1Text}</span>
-                  <ArrowRight size={16} className="!text-white" />
-                </Link>
-              )}
+                {/* Dynamic Action Buttons (Buttons rendered only if dynamic text exists, links static) */}
+                {(btn1Text || btn2Text) ? (
+                  <motion.div
+                    initial={{ opacity: 0, y: 15 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.4, delay: 0.3 }}
+                    className="mt-8 flex flex-wrap items-center gap-4"
+                  >
+                    {btn1Text ? (
+                      <Link
+                        href={btn1Href}
+                        className="inline-flex items-center justify-center gap-2.5 rounded-2xl bg-[#3652BA] !text-white px-7 py-3.5 text-sm font-bold shadow-xl shadow-indigo-600/30 transition-all duration-300 hover:bg-[#283d99] hover:shadow-2xl hover:-translate-y-0.5 border border-indigo-400/30"
+                      >
+                        <span className="!text-white font-bold">{btn1Text}</span>
+                        <ArrowRight size={16} className="!text-white" />
+                      </Link>
+                    ) : null}
 
-              {btn2Text && (
-                <Link
-                  href={btn2Href}
-                  className="inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-700 bg-white/5 !text-white px-7 py-3.5 text-sm font-bold backdrop-blur-md shadow-md transition-all duration-300 hover:bg-white hover:!text-[#0f172a] hover:border-white hover:-translate-y-0.5"
-                >
-                  <PhoneCall size={16} className="text-indigo-400" />
-                  <span className="font-bold">{btn2Text}</span>
-                </Link>
-              )}
-            </motion.div>
+                    {btn2Text ? (
+                      <Link
+                        href={btn2Href}
+                        className="inline-flex items-center justify-center gap-2.5 rounded-2xl border border-slate-700 bg-white/5 !text-white px-7 py-3.5 text-sm font-bold backdrop-blur-md shadow-md transition-all duration-300 hover:bg-white hover:!text-[#0f172a] hover:border-white hover:-translate-y-0.5"
+                      >
+                        <PhoneCall size={16} className="text-indigo-400" />
+                        <span className="font-bold">{btn2Text}</span>
+                      </Link>
+                    ) : null}
+                  </motion.div>
+                ) : null}
+              </>
+            )}
 
             {/* Trust Checklist Badges */}
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ duration: 0.5, delay: 0.4 }}
+              transition={{ duration: 0.4, delay: 0.35 }}
               className="mt-8 pt-6 border-t border-slate-800/80 flex flex-wrap items-center gap-5 text-xs font-semibold text-slate-300"
             >
               <div className="flex items-center gap-1.5">
@@ -302,7 +323,7 @@ export default function HeroCarousel({
             </motion.div>
           </div>
 
-          {/* ================= RIGHT IMAGE MASK CAROUSEL ================= */}
+          {/* ================= RIGHT IMAGE MASK CAROUSEL (Images retain static fallback) ================= */}
           <div className="lg:col-span-6 relative">
             {/* Outer Glow Effect */}
             <div className="absolute -inset-1.5 rounded-[2.5rem] bg-gradient-to-r from-[#3652BA] via-indigo-500 to-[#283d99] opacity-30 blur-xl transition-all duration-500 group-hover:opacity-60" />
@@ -340,10 +361,10 @@ export default function HeroCarousel({
                 <AnimatePresence mode="wait">
                   <motion.div
                     key={currentSlide}
-                    initial={{ opacity: 0, scale: 1.05 }}
+                    initial={{ opacity: 0, scale: 1.04 }}
                     animate={{ opacity: 1, scale: 1 }}
                     exit={{ opacity: 0, scale: 0.98 }}
-                    transition={{ duration: 0.6, ease: "easeInOut" }}
+                    transition={{ duration: 0.5, ease: "easeInOut" }}
                     className="absolute inset-0 h-full w-full"
                   >
                     {activeMedia?.type === "video" ? (
@@ -362,6 +383,9 @@ export default function HeroCarousel({
                         src={activeMedia?.url}
                         alt={activeMedia?.caption || `Hero Slide ${currentSlide + 1}`}
                         className="h-full w-full object-cover object-center brightness-[0.95] contrast-[1.05]"
+                        loading="eager"
+                        decoding="async"
+                        fetchPriority="high"
                         onError={(e) => {
                           e.target.src = FALLBACK_SLIDES[0].url;
                         }}

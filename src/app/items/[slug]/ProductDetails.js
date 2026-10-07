@@ -21,8 +21,8 @@ import {
     getDoc,
     addDoc,
     collection,
-} from "firebase/firestore";
-import { db } from "@/lib/firebase";
+} from "@/lib/client-api";
+import { db } from "@/lib/client-api";
 import { Microscope } from "lucide-react";
 
 const loadImageBase64 = async (src) => {
@@ -193,13 +193,21 @@ const getWebsiteDomain = () => {
     return "diagnosticbloom.com";
 };
 
-export default function ProductDetails({ slug }) {
-    const [product, setProduct] = useState(null);
+export default function ProductDetails({
+    slug,
+    district = "",
+    initialProduct = null,
+    initialContactInfo = [],
+}) {
+    const [product, setProduct] = useState(initialProduct);
+    const initialImg = initialProduct
+        ? ((Array.isArray(initialProduct.images) && initialProduct.images[0]) || initialProduct.image || initialProduct.imgUrl || initialProduct.imageUrl || "")
+        : "";
     const [imageLoaded, setImageLoaded] = useState(false);
-    const [selectedImage, setSelectedImage] = useState("");
+    const [selectedImage, setSelectedImage] = useState(initialImg);
     const [selectedMedia, setSelectedMedia] = useState("image");
     const [showShare, setShowShare] = useState(false);
-    const [contactInfo, setContactInfo] = useState([]);
+    const [contactInfo, setContactInfo] = useState(initialContactInfo);
     const [downloadingBrochure, setDownloadingBrochure] = useState(false);
 
     const shareRef = useRef();
@@ -301,6 +309,18 @@ export default function ProductDetails({ slug }) {
         city.slice(1);
 
     useEffect(() => {
+        if (initialProduct && (initialProduct.slug === slug || makeSlug(initialProduct.title) === slug || initialProduct.id === slug)) {
+            setProduct(initialProduct);
+            const mainImg =
+                (Array.isArray(initialProduct.images) && initialProduct.images[0]) ||
+                initialProduct.image ||
+                initialProduct.imgUrl ||
+                initialProduct.imageUrl ||
+                "";
+            setSelectedImage(mainImg);
+            return;
+        }
+
         const loadProduct = async () => {
             try {
                 const allProducts = await fetchAllDynamicProducts();
@@ -332,9 +352,14 @@ export default function ProductDetails({ slug }) {
         };
 
         loadProduct();
-    }, [slug]);
+    }, [slug, initialProduct]);
 
     useEffect(() => {
+        if (initialContactInfo && initialContactInfo.length > 0) {
+            setContactInfo(initialContactInfo);
+            return;
+        }
+
         const loadContact = async () => {
             try {
                 const snap = await getDoc(
@@ -348,7 +373,7 @@ export default function ProductDetails({ slug }) {
             }
         };
         loadContact();
-    }, []);
+    }, [initialContactInfo]);
 
     const handleDownloadBrochure = async () => {
         if (!product) return;
@@ -823,11 +848,10 @@ export default function ProductDetails({ slug }) {
                                         setSelectedImage(img);
                                         setSelectedMedia("image");
                                     }}
-                                    className={`group relative h-20 w-20 overflow-hidden rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
-                                        selectedMedia === "image" && selectedImage === img
-                                            ? "border-[#3652BA] shadow-lg shadow-indigo-500/20"
-                                            : "border-slate-200 hover:border-[#3652BA]"
-                                    }`}
+                                    className={`group relative h-20 w-20 overflow-hidden rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${selectedMedia === "image" && selectedImage === img
+                                        ? "border-[#3652BA] shadow-lg shadow-indigo-500/20"
+                                        : "border-slate-200 hover:border-[#3652BA]"
+                                        }`}
                                 >
                                     <Image
                                         src={img}
@@ -842,11 +866,10 @@ export default function ProductDetails({ slug }) {
                             {product.video && (
                                 <button
                                     onClick={() => setSelectedMedia("video")}
-                                    className={`group flex h-20 w-20 flex-col items-center justify-center rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${
-                                        selectedMedia === "video"
-                                            ? "border-[#3652BA] bg-indigo-50 shadow-md"
-                                            : "border-slate-200 hover:border-[#3652BA] hover:bg-slate-50"
-                                    }`}
+                                    className={`group flex h-20 w-20 flex-col items-center justify-center rounded-2xl border-2 transition-all duration-300 hover:-translate-y-1 hover:shadow-lg ${selectedMedia === "video"
+                                        ? "border-[#3652BA] bg-indigo-50 shadow-md"
+                                        : "border-slate-200 hover:border-[#3652BA] hover:bg-slate-50"
+                                        }`}
                                 >
                                     <FaPlay size={18} className="text-[#3652BA]" />
                                     <span className="mt-1.5 text-xs font-semibold text-[#0f172a]">Video</span>
@@ -880,6 +903,28 @@ export default function ProductDetails({ slug }) {
                                 <h1 className="mt-4 text-2xl font-black leading-tight text-[#0f172a] sm:text-3xl md:text-4xl lg:text-5xl">
                                     {product.title}
                                 </h1>
+                                {/* Specifications Table */}
+                                {specificationsList.length > 0 && (
+                                    <div className="mt-10 overflow-x-auto rounded-2xl border border-slate-200">
+                                        <table className="w-full border-collapse">
+                                            <tbody>
+                                                {specificationsList.map((item, index) => (
+                                                    <tr
+                                                        key={index}
+                                                        className="border-b border-slate-100 last:border-b-0 transition hover:bg-[#eef2ff]/40"
+                                                    >
+                                                        <td className="w-1/3 bg-[#eef2ff]/70 px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-[#3652BA]">
+                                                            {item.label}
+                                                        </td>
+                                                        <td className="px-5 py-3.5 text-sm font-semibold text-[#0f172a]">
+                                                            {item.value}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                )}
 
                                 {/* Download Brochure Button */}
                                 <div className="mt-6 flex flex-wrap gap-4">
@@ -1029,28 +1074,6 @@ export default function ProductDetails({ slug }) {
                                 {product.desc || product.description || ""}
                             </p>
 
-                            {/* Specifications Table */}
-                            {specificationsList.length > 0 && (
-                                <div className="mt-10 overflow-x-auto rounded-2xl border border-slate-200">
-                                    <table className="w-full border-collapse">
-                                        <tbody>
-                                            {specificationsList.map((item, index) => (
-                                                <tr
-                                                    key={index}
-                                                    className="border-b border-slate-100 last:border-b-0 transition hover:bg-[#eef2ff]/40"
-                                                >
-                                                    <td className="w-1/3 bg-[#eef2ff]/70 px-5 py-3.5 text-xs font-bold uppercase tracking-wider text-[#3652BA]">
-                                                        {item.label}
-                                                    </td>
-                                                    <td className="px-5 py-3.5 text-sm font-semibold text-[#0f172a]">
-                                                        {item.value}
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            )}
 
                             {/* SEO Content */}
                             <div className="mt-12 rounded-[32px] border border-slate-200 bg-white p-6 shadow-sm md:p-10">

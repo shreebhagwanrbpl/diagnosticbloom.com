@@ -3,6 +3,7 @@ import Navbar from "@/components/Navbar";
 import Footer from "@/components/Footer";
 import ScrollToTop from "@/components/ScrollToTop";
 import { Toaster } from "react-hot-toast";
+import { fetchContactData, fetchFullCatalog } from "@/lib/data-fetcher-server";
 
 export const metadata = {
   metadataBase: new URL(
@@ -13,7 +14,7 @@ export const metadata = {
     "Raj Biosis | Biomedical & Diagnostic Equipment",
 
   description:
-    "Raj Biosis Private Limited  supplies CBC Machines, Hematology Analyzers, Biochemistry Analyzers, ELISA Readers and laboratory equipment across India.",
+    "Raj Biosis Private Limited supplies CBC Machines, Hematology Analyzers, Biochemistry Analyzers, ELISA Readers and laboratory equipment across India.",
 
   keywords: [
     "Biomedical Equipment Supplier",
@@ -74,9 +75,25 @@ export const metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }) {
+  const [contactData, catalog] = await Promise.all([
+    fetchContactData().catch(() => null),
+    fetchFullCatalog().catch(() => []),
+  ]);
+
+  const initialContactInfo = contactData?.contactInfo || [];
+  const catSet = new Set();
+  if (Array.isArray(catalog)) {
+    catalog.forEach((p) => {
+      if (p.category && String(p.category).trim() && String(p.category).trim() !== "All Categories") {
+        catSet.add(String(p.category).trim());
+      }
+    });
+  }
+  const initialCategories = Array.from(catSet);
+
   return (
     <html lang="en" suppressHydrationWarning>
       <body className="antialiased bg-[#f8fafc] text-[#0f172a]" suppressHydrationWarning>
@@ -93,7 +110,10 @@ export default function RootLayout({
           {children}
         </main>
 
-        <Footer />
+        <Footer
+          initialContactInfo={initialContactInfo}
+          initialCategories={initialCategories}
+        />
         <ScrollToTop />
       </body>
     </html>

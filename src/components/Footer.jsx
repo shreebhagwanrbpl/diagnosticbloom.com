@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { doc, getDoc } from "@/lib/client-api";
+import { db } from "@/lib/client-api";
 import Link from "next/link";
 import Image from "next/image";
 import { usePathname } from "next/navigation";
@@ -10,10 +10,12 @@ import { Mail, Phone, MapPin, ArrowRight } from "lucide-react";
 import { FaFacebook, FaInstagram } from "react-icons/fa";
 import { fetchAllDynamicProducts } from "@/lib/fetchProducts";
 
-export default function Footer() {
-  const [contactInfo, setContactInfo] = useState([]);
-  const [categories, setCategories] = useState([]);
-  const [loading, setLoading] = useState(true);
+export default function Footer({
+  initialContactInfo = [],
+  initialCategories = [],
+}) {
+  const [contactInfo, setContactInfo] = useState(initialContactInfo);
+  const [categories, setCategories] = useState(initialCategories);
   const [districtData, setDistrictData] = useState(null);
 
   const pathname = usePathname();
@@ -45,26 +47,31 @@ export default function Footer() {
   };
 
   useEffect(() => {
+    if (initialContactInfo.length > 0) {
+      setContactInfo(initialContactInfo);
+    }
+    if (initialCategories.length > 0) {
+      setCategories(initialCategories);
+    }
+
     let isMounted = true;
 
-    const loadData = async () => {
-      try {
-        // 1. Fetch Contact Info
+    // Non-blocking background sync if not preloaded
+    if (!initialContactInfo.length || !initialCategories.length) {
+      const loadData = async () => {
         try {
-          const snap = await getDoc(
-            doc(db, "websites", "diagnosticbloomcom", "pages", "contact")
-          );
-          if (isMounted && snap.exists()) {
-            setContactInfo(snap.data().contactInfo || []);
-          }
-        } catch (contactErr) {
-          console.error("Error loading footer contact:", contactErr);
-        }
+          const [contactSnap, prods] = await Promise.all([
+            getDoc(doc(db, "websites", "diagnosticbloomcom", "pages", "contact")).catch(() => null),
+            fetchAllDynamicProducts().catch(() => []),
+          ]);
 
-        // 2. Fetch Dynamic Product Categories
-        try {
-          const prods = await fetchAllDynamicProducts();
-          if (isMounted && Array.isArray(prods) && prods.length > 0) {
+          if (!isMounted) return;
+
+          if (contactSnap && contactSnap.exists()) {
+            setContactInfo(contactSnap.data().contactInfo || []);
+          }
+
+          if (Array.isArray(prods) && prods.length > 0) {
             const catSet = new Set();
             prods.forEach((p) => {
               if (p.category && String(p.category).trim() && String(p.category).trim() !== "All Categories") {
@@ -73,31 +80,30 @@ export default function Footer() {
             });
             setCategories(Array.from(catSet));
           }
-        } catch (prodErr) {
-          console.error("Error loading footer categories:", prodErr);
+        } catch (err) {
+          console.error("Error loading footer data:", err);
         }
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
+      };
 
-    loadData();
+      loadData();
+    }
 
     return () => {
       isMounted = false;
     };
-  }, []);
+  }, [initialContactInfo, initialCategories]);
 
   useEffect(() => {
-    const loadDistrict = async () => {
-      if (!district) return;
+    if (!district) return;
+    let isMounted = true;
 
+    const loadDistrict = async () => {
       try {
         const snap = await getDoc(
           doc(db, "websites", "diagnosticbloomcom", "districts", district)
         );
 
-        if (snap.exists()) {
+        if (isMounted && snap.exists()) {
           setDistrictData(snap.data());
         }
       } catch (err) {
@@ -106,6 +112,10 @@ export default function Footer() {
     };
 
     loadDistrict();
+
+    return () => {
+      isMounted = false;
+    };
   }, [district]);
 
   // Extract phone numbers flexibly from Firestore contactInfo
@@ -162,31 +172,6 @@ export default function Footer() {
   // Categories are shown only when they come from the live catalog.
   const displayCategories = useMemo(() => categories.slice(0, 6), [categories]);
 
-  if (loading) {
-    return (
-      <footer className="border-t border-slate-200 bg-[#f8fafc]">
-        <div className="container-custom py-16">
-          <div className="grid gap-10 md:grid-cols-2 lg:grid-cols-4">
-            {[...Array(4)].map((_, i) => (
-              <div key={i}>
-                <div className="mb-6 h-8 w-40 animate-pulse rounded bg-slate-200" />
-                {[...Array(5)].map((_, j) => (
-                  <div
-                    key={j}
-                    className="mb-4 h-5 animate-pulse rounded bg-slate-100"
-                  />
-                ))}
-              </div>
-            ))}
-          </div>
-          <div className="mt-12 border-t border-slate-200 pt-6">
-            <div className="h-5 w-72 animate-pulse rounded bg-slate-200" />
-          </div>
-        </div>
-      </footer>
-    );
-  }
-
   return (
     <footer className="border-t border-slate-200 bg-gradient-to-b from-white via-[#f8fafc] to-[#eef2ff]">
       <div className="container-custom py-14 sm:py-16">
@@ -202,6 +187,7 @@ export default function Footer() {
                   src="/logo.png"
                   alt="Raj Biosis Private Limited"
                   fill
+                  priority
                   className="object-contain object-left"
                 />
               </Link>
@@ -290,23 +276,23 @@ export default function Footer() {
             </div>
           </div>
 
-          {/* Contact Info - Purely Dynamic from Firestore */}
+          {/* Contact Info - Purely Dynamic & Preloaded for Instant Rendering */}
           <div>
             <h3 className="mb-5 text-lg font-bold text-[#0f172a]">
               Contact Info
             </h3>
 
             <div className="space-y-4 text-[#64748b]">
-              {dynamicAddress && (
+              {dynamicAddress ? (
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef2ff] border border-indigo-100">
                     <MapPin size={18} className="text-[#3652BA]" />
                   </div>
                   <p className="leading-6 text-sm">{dynamicAddress}</p>
                 </div>
-              )}
+              ) : null}
 
-              {phones.length > 0 && (
+              {phones.length > 0 ? (
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef2ff] border border-indigo-100">
                     <Phone size={18} className="text-[#3652BA]" />
@@ -323,9 +309,9 @@ export default function Footer() {
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
 
-              {emails.length > 0 && (
+              {emails.length > 0 ? (
                 <div className="flex items-start gap-3">
                   <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#eef2ff] border border-indigo-100">
                     <Mail size={18} className="text-[#3652BA]" />
@@ -342,7 +328,7 @@ export default function Footer() {
                     ))}
                   </div>
                 </div>
-              )}
+              ) : null}
 
               {!dynamicAddress && phones.length === 0 && emails.length === 0 && (
                 <p className="text-xs text-[#64748b]">
